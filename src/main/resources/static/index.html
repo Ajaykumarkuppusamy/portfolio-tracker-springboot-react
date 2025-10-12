@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stock Portfolio Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        /* Simple transition for modals */
+        .modal-enter {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        .modal-enter-active {
+            opacity: 1;
+            transform: scale(1);
+            transition: opacity 300ms, transform 300ms;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, createContext, useContext } = React;
+
+        // --- CONTEXT & API --- //
+        const AuthContext = createContext(null);
+
+        const AuthProvider = ({ children }) => {
+            const [token, setToken] = useState(() => localStorage.getItem('token'));
+
+            useEffect(() => {
+                if (token) {
+                    localStorage.setItem('token', token);
+                } else {
+                    localStorage.removeItem('token');
+                }
+            }, [token]);
+
+            const login = (newToken) => setToken(newToken);
+            const logout = () => setToken(null);
+
+            return (
+                <AuthContext.Provider value={{ token, login, logout }}>
+                    {children}
+                </AuthContext.Provider>
+            );
+        };
+
+        const useAuth = () => useContext(AuthContext);
+
+        const api = {
+            baseUrl: '/api', // Use relative path
+            getHeaders: (token) => ({
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }),
+
+            async request(endpoint, options) {
+                const response = await fetch(`${this.baseUrl}${endpoint}`, options);
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorBody}`);
+                }
+                // Handle responses with no content
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    return response.json();
+                }
+                return response.text();
+            },
+
+            login: (email, password) => api.request('/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }),
+            register: (email, password) => api.request('/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }),
+            getPortfolios: (token) => api.request('/portfolios', { headers: api.getHeaders(token) }),
+            createPortfolio: (token, data) => api.request('/portfolios', { method: 'POST', headers: api.getHeaders(token), body: JSON.stringify(data) }),
+            getPositions: (token, id) => api.request(`/positions?portfolioId=${id}`, { headers: api.getHeaders(token) }),
+            getTrades: (token, id) => api.request(`/trades?portfolioId=${id}`, { headers: api.getHeaders(token) }),
+            addTrade: (token, data) => api.request('/trades', { method: 'POST', headers: api.getHeaders(token), body: JSON.stringify(data) }),
+        };
+
+        // --- MAIN APP & LAYOUT --- //
+        function App() {
+            const { token } = useAuth();
+            return (
+                <div className="min-h-screen">
+                    <Header />
+                    <main className="p-4 md:p-8">
+                      {token ? <PortfolioManager /> : <AuthPage />}
+                    </main>
+                </div>
+            );
+        }
+
+        function Header() {
+            const { token, logout } = useAuth();
+            return (
+                <header className="bg-gray-800 p-4 shadow-md flex justify-between items-center">
+                    <h1 className="text-2xl font-bold text-green-400">Portfolio Tracker</h1>
+                    {token && <button onClick={logout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition-colors">Logout</button>}
+                </header>
+            );
+        }
+        
+        // --- AUTHENTICATION --- //
+        function AuthPage() {
+            const [isLogin, setIsLogin] = useState(true);
+            const { login } = useAuth();
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [message, setMessage] = useState('');
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError('');
+                setMessage('');
+                try {
+                    if (isLogin) {
+                        const data = await api.login(email, password);
+                        login(data.jwt);
+                    } else {
+                        await api.register(email, password);
+                        setMessage("Registration successful! Please login.");
+                        setIsLogin(true);
+                    }
+                } catch (err) {
+                    setError(err.message || 'An error occurred.');
+                }
+            };
+            
+            return (
+                <div className="max-w-md mx-auto mt-10 p-8 bg-gray-800 rounded-lg shadow-lg">
+                    <h2 className="text-3xl font-bold text-center text-green-400 mb-6">{isLogin ? 'Login' : 'Register'}</h2>
+                    {error && <p className="text-red-500 text-center mb-4">{error}</p>}
+                    {message && <p className="text-green-500 text-center mb-4">{message}</p>}
+                    <form onSubmit={handleSubmit}>
+                         <div className="mb-4">
+                            <label className="block text-gray-400 mb-2" htmlFor="email">Email</label>
+                            <input type="email" id="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-green-500" required />
+                        </div>
+                        <div className="mb-6">
+                             <label className="block text-gray-400 mb-2" htmlFor="password">Password</label>
+                            <input type="password" id="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-green-500" required />
+                        </div>
+                        <button type="submit" className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition duration-300">
+                            {isLogin ? 'Login' : 'Create Account'}
+                        </button>
+                    </form>
+                     <p className="text-center mt-4">
+                        {isLogin ? "Don't have an account?" : "Already have an account?"}
+                        <button onClick={() => setIsLogin(!isLogin)} className="text-green-400 hover:underline ml-2">
+                            {isLogin ? 'Register' : 'Login'}
+                        </button>
+                    </p>
+                </div>
+            );
+        }
+        
+        // --- CORE LOGIC: PORTFOLIO & DASHBOARD MANAGEMENT --- //
+        function PortfolioManager() {
+            const { token } = useAuth();
+            const [portfolios, setPortfolios] = useState([]);
+            const [selectedPortfolio, setSelectedPortfolio] = useState(null);
+            const [isLoading, setIsLoading] = useState(true);
+            const [error, setError] = useState('');
+            const [showAddTrade, setShowAddTrade] = useState(false);
+
+            useEffect(() => {
+                const fetchPortfolios = async () => {
+                    try {
+                        const data = await api.getPortfolios(token);
+                        setPortfolios(data);
+                        if (data.length > 0) {
+                            setSelectedPortfolio(data[0]);
+                        }
+                    } catch (e) {
+                        setError("Could not fetch portfolios.");
+                    } finally {
+                        setIsLoading(false);
+                    }
+                };
+                fetchPortfolios();
+            }, [token]);
+
+            const handlePortfolioCreated = (newPortfolio, isFirstPortfolio) => {
+                setPortfolios(prev => [...prev, newPortfolio]);
+                setSelectedPortfolio(newPortfolio);
+                if (isFirstPortfolio) {
+                    // This is the key part of the new flow!
+                    setShowAddTrade(true);
+                }
+            };
+
+            const handleTradeAdded = () => {
+                setShowAddTrade(false);
+                // We'll need to refresh the dashboard data.
+                // A simple way is to temporarily nullify the selected portfolio to trigger a re-fetch in Dashboard
+                const currentPortfolio = selectedPortfolio;
+                setSelectedPortfolio(null);
+                setTimeout(() => setSelectedPortfolio(currentPortfolio), 0);
+            };
+
+            if (isLoading) return <div className="text-center text-xl">Loading Portfolios...</div>;
+            if (error) return <div className="text-center text-red-400">{error}</div>;
+
+            if (portfolios.length === 0) {
+                return <WelcomeScreen onPortfolioCreated={(p) => handlePortfolioCreated(p, true)} />;
+            }
+            
+            return (
+                <div>
+                    <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <label htmlFor="portfolio-select" className="text-lg">Portfolio:</label>
+                            <select
+                                id="portfolio-select"
+                                value={selectedPortfolio?.id || ''}
+                                onChange={(e) => setSelectedPortfolio(portfolios.find(p => p.id == e.target.value))}
+                                className="p-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-green-500"
+                            >
+                                {portfolios.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                        <CreatePortfolioModal onPortfolioCreated={(p) => handlePortfolioCreated(p, false)} />
+                    </div>
+                    
+                    {selectedPortfolio && <Dashboard portfolio={selectedPortfolio} onAddTradeClick={() => setShowAddTrade(true)}/>}
+                    
+                    {showAddTrade && selectedPortfolio && (
+                        <AddTradeModal
+                            portfolioId={selectedPortfolio.id}
+                            onClose={() => setShowAddTrade(false)}
+                            onTradeAdded={handleTradeAdded}
+                        />
+                    )}
+                </div>
+            );
+        }
+
+        function WelcomeScreen({ onPortfolioCreated }) {
+             const { token } = useAuth();
+             const [name, setName] = useState('');
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                try {
+                    const newPortfolio = await api.createPortfolio(token, { name, baseCurrency: 'INR' });
+                    onPortfolioCreated(newPortfolio);
+                } catch (err) {
+                    alert("Failed to create portfolio.");
+                }
+            };
+
+            return (
+                <div className="max-w-xl mx-auto mt-10 p-8 text-center bg-gray-800 rounded-lg shadow-lg">
+                    <h2 className="text-3xl font-bold text-green-400 mb-4">Welcome!</h2>
+                    <p className="text-gray-400 mb-8">Let's start by creating your first portfolio to track your investments.</p>
+                     <form onSubmit={handleSubmit} className="flex flex-col items-center gap-4">
+                        <input 
+                            type="text" 
+                            value={name} 
+                            onChange={e => setName(e.target.value)} 
+                            className="w-full max-w-sm p-3 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-green-500 text-center" 
+                            placeholder="e.g., Long Term Investments" 
+                            required 
+                        />
+                        <button type="submit" className="w-full max-w-sm bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded transition duration-300">
+                            Create Portfolio
+                        </button>
+                    </form>
+                </div>
+            )
+        }
+
+        function Dashboard({ portfolio, onAddTradeClick }) {
+            const { token } = useAuth();
+            const [data, setData] = useState({ positions: [], trades: [] });
+            const [isLoading, setIsLoading] = useState(true);
+            const [error, setError] = useState('');
+            
+            useEffect(() => {
+                const fetchData = async () => {
+                    if (!portfolio) return;
+                    setIsLoading(true);
+                    setError('');
+                    try {
+                        const [posData, tradeData] = await Promise.all([
+                            api.getPositions(token, portfolio.id),
+                            api.getTrades(token, portfolio.id)
+                        ]);
+                        setData({ positions: posData, trades: tradeData });
+                    } catch (e) {
+                       setError(`Failed to fetch data for portfolio.`);
+                    } finally {
+                        setIsLoading(false);
+                    }
+                };
+                fetchData();
+            }, [token, portfolio]);
+
+            if (isLoading) return <div className="text-center mt-8">Loading portfolio details...</div>
+            if (error) return <div className="text-center text-red-400 mt-8">{error}</div>
+
+            return (
+                <div>
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-3xl font-bold">Positions</h2>
+                         <button onClick={onAddTradeClick} className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">Add Trade</button>
+                    </div>
+                    
+                    <PositionsTable positions={data.positions} />
+                    
+                    <h2 className="text-3xl font-bold mt-10 mb-6">Trade History</h2>
+                    <TradesTable trades={data.trades} />
+                </div>
+            );
+        }
+        
+        // --- MODALS --- //
+
+        function CreatePortfolioModal({ onPortfolioCreated }) {
+            const { token } = useAuth();
+            const [name, setName] = useState('');
+            const [isOpen, setIsOpen] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                try {
+                    const newPortfolio = await api.createPortfolio(token, { name, baseCurrency: 'INR' });
+                    onPortfolioCreated(newPortfolio);
+                    setName('');
+                    setIsOpen(false);
+                } catch (err) {
+                    alert("Failed to create portfolio.");
+                }
+            };
+            
+            return (
+                <>
+                    <button onClick={() => setIsOpen(true)} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+                        New Portfolio
+                    </button>
+                    {isOpen && (
+                         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 modal-enter-active modal-enter">
+                            <div className="bg-gray-800 p-8 rounded-lg shadow-2xl w-full max-w-md">
+                                <h2 className="text-3xl font-bold text-center text-green-400 mb-6">Create New Portfolio</h2>
+                                <form onSubmit={handleSubmit}>
+                                    <div className="mb-4">
+                                        <label className="block text-gray-400 mb-2" htmlFor="portfolioName">Portfolio Name</label>
+                                        <input type="text" id="portfolioName" value={name} onChange={e => setName(e.target.value)} className="w-full p-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-green-500" placeholder="e.g., Swing Trades" required />
+                                    </div>
+                                    <div className="flex justify-end gap-4 mt-6">
+                                        <button type="button" onClick={() => setIsOpen(false)} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Cancel</button>
+                                        <button type="submit" className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">Create</button>
+                                    </div>
+                                </form>
+                            </div>
+                         </div>
+                    )}
+                </>
+            );
+        }
+
+        function AddTradeModal({ portfolioId, onClose, onTradeAdded }) {
+            const { token } = useAuth();
+            const [symbol, setSymbol] = useState('RELIANCE');
+            const [side, setSide] = useState('BUY');
+            const [quantity, setQuantity] = useState('');
+            const [price, setPrice] = useState('');
+            const [tradeDatetime, setTradeDatetime] = useState(new Date().toISOString().slice(0, 16));
+
+            const indianStocks = [
+                { id: 1, ticker: 'RELIANCE' }, { id: 2, ticker: 'TCS' }, { id: 3, ticker: 'HDFCBANK' },
+                { id: 4, ticker: 'INFY' }, { id: 5, ticker: 'ICICIBANK' }, { id: 6, ticker: 'HINDUNILVR' },
+                { id: 7, ticker: 'SBIN' }, { id: 8, ticker: 'BAJFINANCE' }
+            ];
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                const selectedSymbol = indianStocks.find(s => s.ticker === symbol);
+                const tradeData = {
+                    portfolio: { id: portfolioId },
+                    symbol: { id: selectedSymbol.id },
+                    side,
+                    quantity: parseFloat(quantity),
+                    price: parseFloat(price),
+                    tradeDatetime: new Date(tradeDatetime).toISOString()
+                };
+                try {
+                    await api.addTrade(token, tradeData);
+                    onTradeAdded();
+                } catch(err) {
+                    alert("Failed to add trade. " + err.message);
+                }
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 modal-enter-active modal-enter">
+                    <div className="bg-gray-800 p-8 rounded-lg shadow-2xl w-full max-w-md">
+                        <h3 className="text-2xl font-bold mb-6 text-green-400">Add New Trade</h3>
+                        <form onSubmit={handleSubmit}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label className="block text-gray-400 mb-2">Symbol</label>
+                                    <select value={symbol} onChange={e => setSymbol(e.target.value)} className="w-full p-2 rounded bg-gray-700 border border-gray-600">
+                                        {indianStocks.map(s => <option key={s.id} value={s.ticker}>{s.ticker}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-gray-400 mb-2">Side</label>
+                                    <select value={side} onChange={e => setSide(e.target.value)} className="w-full p-2 rounded bg-gray-700 border border-gray-600">
+                                        <option value="BUY">BUY</option>
+                                        <option value="SELL">SELL</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-gray-400 mb-2">Quantity</label>
+                                    <input type="number" step="any" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full p-2 rounded bg-gray-700 border border-gray-600" required />
+                                </div>
+                                <div>
+                                    <label className="block text-gray-400 mb-2">Price</label>
+                                    <input type="number" step="any" value={price} onChange={e => setPrice(e.target.value)} className="w-full p-2 rounded bg-gray-700 border border-gray-600" required />
+                                </div>
+                            </div>
+                            <div className="mb-6">
+                                <label className="block text-gray-400 mb-2">Trade Date & Time</label>
+                                <input type="datetime-local" value={tradeDatetime} onChange={e => setTradeDatetime(e.target.value)} className="w-full p-2 rounded bg-gray-700 border border-gray-600" required />
+                            </div>
+                            <div className="flex justify-end gap-4">
+                                <button type="button" onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Cancel</button>
+                                <button type="submit" className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">Add Trade</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- DISPLAY TABLES --- //
+        function PositionsTable({ positions }) {
+             if (positions.length === 0) {
+                return (
+                    <div className="text-center text-gray-400 mt-8 bg-gray-800 p-6 rounded-lg">
+                        <h3 className="text-lg font-semibold">No positions yet.</h3>
+                        <p>Add a 'BUY' trade to see your first position here!</p>
+                    </div>
+                );
+            }
+            return (
+                <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead className="bg-gray-700">
+                                <tr>
+                                    <th className="p-4 text-left text-sm font-semibold text-gray-300">Symbol</th>
+                                    <th className="p-4 text-right text-sm font-semibold text-gray-300">Quantity</th>
+                                    <th className="p-4 text-right text-sm font-semibold text-gray-300">Avg. Cost</th>
+                                    <th className="p-4 text-right text-sm font-semibold text-gray-300">Last Price</th>
+                                    <th className="p-4 text-right text-sm font-semibold text-gray-300">Market Value</th>
+                                    <th className="p-4 text-right text-sm font-semibold text-gray-300">Unrealized P&L</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {positions.map((pos, index) => {
+                                    const isProfit = pos.unrealizedPL >= 0;
+                                    const marketValue = (pos.quantity * pos.lastPrice);
+                                    return (
+                                        <tr key={index} className="border-b border-gray-700 hover:bg-gray-700/50">
+                                            <td className="p-4 font-bold">{pos.symbol.ticker}</td>
+                                            <td className="p-4 text-right">{parseFloat(pos.quantity).toFixed(2)}</td>
+                                            <td className="p-4 text-right">₹{parseFloat(pos.averageCost).toFixed(2)}</td>
+                                            <td className="p-4 text-right">₹{parseFloat(pos.lastPrice).toFixed(2)}</td>
+                                            <td className="p-4 text-right">₹{marketValue.toFixed(2)}</td>
+                                            <td className={`p-4 text-right font-semibold ${isProfit ? 'text-green-400' : 'text-red-400'}`}>
+                                                {isProfit ? '+' : ''}₹{parseFloat(pos.unrealizedPL).toFixed(2)} ({parseFloat(pos.unrealizedPLPercent).toFixed(2)}%)
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+        
+        function TradesTable({ trades }) {
+            if (trades.length === 0) {
+                 return (
+                    <div className="text-center text-gray-400 mt-8 bg-gray-800 p-6 rounded-lg">
+                        <h3 className="text-lg font-semibold">No trade history.</h3>
+                        <p>Your recorded trades for this portfolio will appear here.</p>
+                    </div>
+                 );
+            }
+            return (
+                 <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead className="bg-gray-700">
+                                <tr>
+                                    <th className="p-4 text-left text-sm font-semibold text-gray-300">Date</th>
+                                    <th className="p-4 text-left text-sm font-semibold text-gray-300">Symbol</th>
+                                    <th className="p-4 text-left text-sm font-semibold text-gray-300">Side</th>
+                                    <th className="p-4 text-right text-sm font-semibold text-gray-300">Quantity</th>
+                                    <th className="p-4 text-right text-sm font-semibold text-gray-300">Price</th>
+                                    <th className="p-4 text-right text-sm font-semibold text-gray-300">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {trades.slice().reverse().map((trade) => (
+                                    <tr key={trade.id} className="border-b border-gray-700 hover:bg-gray-700/50">
+                                        <td className="p-4">{new Date(trade.tradeDatetime).toLocaleDateString()}</td>
+                                        <td className="p-4 font-bold">{trade.symbol.ticker}</td>
+                                        <td className={`p-4 font-semibold ${trade.side === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>
+                                            {trade.side}
+                                        </td>
+                                        <td className="p-4 text-right">{parseFloat(trade.quantity).toFixed(2)}</td>
+                                        <td className="p-4 text-right">₹{parseFloat(trade.price).toFixed(2)}</td>
+                                        <td className="p-4 text-right">₹{(trade.quantity * trade.price).toFixed(2)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(
+            <AuthProvider>
+                <App />
+            </AuthProvider>
+        );
+
+    </script>
+</body>
+</html>
+

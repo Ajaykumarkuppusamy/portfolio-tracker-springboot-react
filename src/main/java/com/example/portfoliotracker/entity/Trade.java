@@ -1,0 +1,63 @@
+package com.example.portfoliotracker.entity;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties; // Add this import
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
+@Table(name = "trades")
+// --- THIS IS THE FIX ---
+// Adding it here as well, as the Trade object also has lazy-loaded relationships
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+public class Trade {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "portfolio_id", nullable = false)
+    private Portfolio portfolio;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "symbol_id", nullable = false)
+    private Symbol symbol;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TradeSide side;
+
+    @Column(nullable = false)
+    private BigDecimal quantity;
+
+    @Column(nullable = false)
+    private BigDecimal price;
+
+    @Column(nullable = false)
+    private LocalDateTime tradeDatetime;
+
+    private BigDecimal fees;
+    private String reason;
+    private String tag;
+
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+    
+    public enum TradeSide {
+        BUY, SELL
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
+}
+
