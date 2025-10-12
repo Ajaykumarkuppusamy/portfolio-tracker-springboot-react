@@ -1,16 +1,34 @@
-# Use an official OpenJDK runtime as a parent image
-FROM openjdk:17-jdk-slim
+# --- Stage 1: Build the application with Maven ---
+# Use a Maven image that includes a JDK to build the project
+FROM maven:3.8.5-openjdk-17 AS build
 
-# Set the working directory in the container
+# Set the working directory
 WORKDIR /app
 
-# Copy the fat jar into the container at /app
-# The JAR file is created by the Spring Boot build process
-COPY target/*.jar app.jar
+# Copy the pom.xml file to download dependencies first (for caching)
+COPY pom.xml .
 
-# Make port 8080 available to the world outside this container
+# Copy the rest of the source code
+COPY src ./src
+
+# Run the Maven package command to build the project and create the .jar file
+# The -DskipTests flag is used to speed up the build process in CI/CD environments
+RUN mvn clean package -DskipTests
+
+
+# --- Stage 2: Create the final, lightweight image ---
+# Use a slim Java runtime image, which is smaller and more secure
+FROM openjdk:17-jdk-slim
+
+# Set the working directory
+WORKDIR /app
+
+# Copy ONLY the generated .jar file from the 'build' stage
+COPY --from=build /app/target/*.jar app.jar
+
+# Expose port 8080 so the application can be accessed
 EXPOSE 8080
 
-# Run the jar file
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# The command to run the application
+ENTRYPOINT ["java","-jar","app.jar"]
 
