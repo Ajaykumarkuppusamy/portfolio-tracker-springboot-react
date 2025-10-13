@@ -23,49 +23,41 @@ public class PortfolioService {
         this.userRepository = userRepository;
     }
 
-    @Transactional
-    public PortfolioDto createPortfolio(PortfolioDto portfolioDto, String userEmail) {
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + userEmail));
-
-        Portfolio portfolio = Portfolio.builder()
-                .user(user)
-                .name(portfolioDto.getName())
-                .baseCurrency(portfolioDto.getBaseCurrency() != null ? portfolioDto.getBaseCurrency() : "INR")
-                .build();
-
-        Portfolio savedPortfolio = portfolioRepository.save(portfolio);
-
-        return mapToDto(savedPortfolio);
-    }
-
-    @Transactional(readOnly = true)
     public List<PortfolioDto> getPortfoliosForUser(String userEmail) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + userEmail));
 
-        return user.getPortfolios().stream()
-                .map(this::mapToDto)
+        return portfolioRepository.findByUserId(user.getId())
+                .stream()
+                .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
-    
-    // Add this to your Portfolio entity to make the above call work
-    // In Portfolio.java, add:
-    // @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    // private List<Portfolio> portfolios = new ArrayList<>();
-    //
-    // For now, we will query the repository directly to avoid changing the entity
-    @Transactional(readOnly = true)
-    public List<PortfolioDto> findPortfoliosByUserEmail(String userEmail) {
+
+    @Transactional
+    public PortfolioDto createPortfolio(PortfolioDto portfolioDto, String userEmail) {
+        // 1. Find the user inside the transaction
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + userEmail));
-        return portfolioRepository.findByUserId(user.getId()).stream()
-                .map(this::mapToDto)
-                .collect(Collectors.toList());
+
+        // 2. Create and prepare the new portfolio
+        Portfolio portfolio = new Portfolio();
+        portfolio.setName(portfolioDto.getName());
+        portfolio.setBaseCurrency(portfolioDto.getBaseCurrency());
+        portfolio.setUser(user); // 3. Link it to the managed user entity
+
+        // 4. Save the portfolio
+        Portfolio savedPortfolio = portfolioRepository.save(portfolio);
+
+        // 5. Return the DTO of the saved portfolio
+        return convertToDto(savedPortfolio);
     }
 
-
-    private PortfolioDto mapToDto(Portfolio portfolio) {
-        return new PortfolioDto(portfolio.getId(), portfolio.getName(), portfolio.getBaseCurrency());
+    private PortfolioDto convertToDto(Portfolio portfolio) {
+        PortfolioDto dto = new PortfolioDto();
+        dto.setId(portfolio.getId());
+        dto.setName(portfolio.getName());
+        dto.setBaseCurrency(portfolio.getBaseCurrency());
+        return dto;
     }
 }
+

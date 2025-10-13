@@ -4,8 +4,7 @@ import com.example.portfoliotracker.dto.PortfolioDto;
 import com.example.portfoliotracker.service.PortfolioService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -21,16 +20,27 @@ public class PortfolioController {
         this.portfolioService = portfolioService;
     }
 
-    @PostMapping
-    public ResponseEntity<PortfolioDto> createPortfolio(@RequestBody PortfolioDto portfolioDto, Principal principal) {
-        PortfolioDto createdPortfolio = portfolioService.createPortfolio(portfolioDto, principal.getName());
-        return new ResponseEntity<>(createdPortfolio, HttpStatus.CREATED);
-    }
-
     @GetMapping
-    public ResponseEntity<List<PortfolioDto>> getUserPortfolios(Principal principal) {
-        // Using principal.getName() which returns the username (our email)
-        List<PortfolioDto> portfolios = portfolioService.findPortfoliosByUserEmail(principal.getName());
+    public ResponseEntity<List<PortfolioDto>> getPortfolios(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        List<PortfolioDto> portfolios = portfolioService.getPortfoliosForUser(principal.getName());
         return ResponseEntity.ok(portfolios);
     }
+
+    @PostMapping
+    public ResponseEntity<PortfolioDto> createPortfolio(@RequestBody PortfolioDto portfolioDto, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        try {
+            // The entire creation logic is now handled by the service in a single transaction
+            PortfolioDto createdPortfolio = portfolioService.createPortfolio(portfolioDto, principal.getName());
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdPortfolio);
+        } catch (UsernameNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+    }
 }
+
