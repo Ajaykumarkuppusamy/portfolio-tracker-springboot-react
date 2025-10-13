@@ -1,6 +1,6 @@
 package com.example.portfoliotracker.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties; // Add this import
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,8 +15,6 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Entity
 @Table(name = "trades")
-// --- THIS IS THE FIX ---
-// Adding it here as well, as the Trade object also has lazy-loaded relationships
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Trade {
     @Id
@@ -50,10 +48,6 @@ public class Trade {
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
-    
-    public enum TradeSide {
-        BUY, SELL
-    }
 
     @PrePersist
     protected void onCreate() {

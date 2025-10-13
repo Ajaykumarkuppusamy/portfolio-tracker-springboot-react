@@ -27,15 +27,14 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
-                // NOTE: If you deleted WebConfig.java for CORS, you can remove this next line.
-                // If you kept it, this line doesn't hurt.
-                .cors(cors -> {})
                 .authorizeHttpRequests(auth -> auth
-                        // --- THIS IS THE UPDATED PART ---
-                        // Allow access to the API auth endpoints AND the root URL for the frontend
-                        .requestMatchers("/api/auth/**", "/", "/index.html").permitAll()
-                        // All other requests must be authenticated
-                        .anyRequest().authenticated()
+                        // Allow unauthenticated access to the login/register API and all frontend assets
+                        .requestMatchers("/api/auth/**", "/", "/index.html", "/favicon.ico").permitAll()
+                        // --- THIS IS THE FIX ---
+                        // Explicitly require authentication for ANY other request under /api/
+                        .requestMatchers("/api/**").authenticated()
+                        // Any other request not specified should be permitted (less strict for non-API calls)
+                        .anyRequest().permitAll()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 

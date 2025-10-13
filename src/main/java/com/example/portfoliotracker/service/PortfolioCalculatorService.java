@@ -2,6 +2,7 @@ package com.example.portfoliotracker.service;
 
 import com.example.portfoliotracker.entity.Lot;
 import com.example.portfoliotracker.entity.Trade;
+import com.example.portfoliotracker.entity.TradeSide; // Import the standalone enum
 import com.example.portfoliotracker.repository.LotRepository;
 import com.example.portfoliotracker.repository.TradeRepository;
 import com.example.portfoliotracker.dto.PositionDto;
@@ -11,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -33,7 +33,9 @@ public class PortfolioCalculatorService {
             positions.putIfAbsent(symbolId, new PositionDto(trade.getSymbol()));
             
             PositionDto position = positions.get(symbolId);
-            if (trade.getSide() == Trade.TradeSide.BUY) {
+            // --- FIX ---
+            // Refer to the standalone TradeSide enum
+            if (trade.getSide() == TradeSide.BUY) {
                 position.add(trade.getQuantity(), trade.getPrice());
             } else { // SELL
                 position.subtract(trade.getQuantity());
@@ -47,18 +49,25 @@ public class PortfolioCalculatorService {
             });
         });
 
-        return new ArrayList<>(positions.values());
+        // Filter out positions with zero quantity
+        return positions.values().stream()
+                .filter(p -> p.getQuantity().compareTo(BigDecimal.ZERO) != 0)
+                .collect(Collectors.toList());
     }
 
     @Transactional
     public void processLotsForSellTrade(Trade sellTrade) {
-        // This is a simplified FIFO implementation. A real-world one would be more complex.
-        List<Trade> buys = tradeRepository.findByPortfolioIdOrderByTradeDatetimeAsc(sellTrade.getPortfolio().getId())
-                .stream()
-                .filter(t -> t.getSymbol().equals(sellTrade.getSymbol()) && t.getSide() == Trade.TradeSide.BUY)
-                .collect(Collectors.toList());
+        // This is a simplified FIFO implementation.
+        List<Trade> buys = tradeRepository.findByPortfolioIdAndSymbolIdAndSideOrderByTradeDatetimeAsc(
+            sellTrade.getPortfolio().getId(),
+            sellTrade.getSymbol().getId(),
+            TradeSide.BUY // --- FIX ---
+        );
 
-        List<Lot> lots = lotRepository.findByTradeBuyPortfolioId(sellTrade.getPortfolio().getId());
+        List<Lot> lots = lotRepository.findByTradeBuyPortfolioIdAndTradeBuySymbolId(
+            sellTrade.getPortfolio().getId(),
+            sellTrade.getSymbol().getId()
+        );
 
         Map<Long, BigDecimal> soldQuantities = new HashMap<>();
         lots.forEach(lot -> soldQuantities.merge(lot.getTradeBuy().getId(), lot.getQuantity(), BigDecimal::add));
@@ -95,7 +104,7 @@ public class PortfolioCalculatorService {
     
     @Transactional(readOnly = true)
     public List<RealizedPnLDto> calculateRealizedPnL(Long portfolioId) {
-        return lotRepository.findByTradeBuyPortfolioId(portfolioId)
+        return lotRepository.findByTradeSellPortfolioId(portfolioId) // Corrected logic to fetch lots by sell trade
             .stream()
             .filter(lot -> lot.getRealizedPl() != null)
             .map(lot -> new RealizedPnLDto(
@@ -109,3 +118,4 @@ public class PortfolioCalculatorService {
             .collect(Collectors.toList());
     }
 }
+
