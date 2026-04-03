@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { portfolioService, marketService } from '../services/api';
 import { X, Search } from 'lucide-react';
 
@@ -8,7 +8,7 @@ interface Props {
   onTradeAdded: () => void;
 }
 
-const AddTradeModal: React.FC<Props> = ({ portfolioId, onClose, onTradeAdded }) => {
+const AddTradeModal = ({ portfolioId, onClose, onTradeAdded }: Props) => {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -36,7 +36,7 @@ const AddTradeModal: React.FC<Props> = ({ portfolioId, onClose, onTradeAdded }) 
     return () => clearTimeout(timer);
   }, [query]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedSymbol) return alert("Please select a stock.");
     

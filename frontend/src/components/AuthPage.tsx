@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { authService } from '../services/api';
 import { Eye, EyeOff } from 'lucide-react';
 
-const AuthPage: React.FC = () => {
+const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
   const { login } = useAuthStore();
   const [email, setEmail] = useState('');
@@ -13,7 +13,7 @@ const AuthPage: React.FC = () => {
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
     setMessage('');

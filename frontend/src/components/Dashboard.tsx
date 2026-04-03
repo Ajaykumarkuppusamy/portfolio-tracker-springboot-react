@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { portfolioService } from '../services/api';
 import PositionsTable from './PositionsTable';
 import TradesTable from './TradesTable';
@@ -6,7 +6,7 @@ import VoiceAssistantButton from './VoiceAssistantButton';
 import AddTradeModal from './AddTradeModal';
 import { Plus, TrendingUp, BriefcaseBusiness, ListPlus } from 'lucide-react';
 
-const Dashboard: React.FC = () => {
+const Dashboard = () => {
   const [portfolios, setPortfolios] = useState<any[]>([]);
   const [selectedPortfolio, setSelectedPortfolio] = useState<any>(null);
   const [data, setData] = useState({ positions: [], trades: [] });

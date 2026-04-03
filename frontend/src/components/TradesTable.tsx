@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { portfolioService } from '../services/api';
 import { Trash2 } from 'lucide-react';
 
@@ -16,7 +16,7 @@ interface Props {
   onTradeDeleted: () => void;
 }
 
-const TradesTable: React.FC<Props> = ({ trades, onTradeDeleted }) => {
+const TradesTable = ({ trades, onTradeDeleted }: Props) => {
   const handleDelete = async (tradeId: number) => {
     if (confirm("Are you sure you want to delete this trade?")) {
       try {

@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 interface Position {
   symbol: { id: number; ticker: string };
@@ -13,7 +13,7 @@ interface Props {
   positions: Position[];
 }
 
-const PositionsTable: React.FC<Props> = ({ positions }) => {
+const PositionsTable = ({ positions }: Props) => {
   if (positions.length === 0) {
     return (
       <div className="text-center text-gray-400 mt-6 bg-gray-800/40 p-10 rounded-2xl border border-gray-700/50 backdrop-blur-sm">

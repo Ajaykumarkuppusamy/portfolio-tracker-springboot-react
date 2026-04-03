@@ -1,8 +1,8 @@
-import React from 'react';
+
 import { useAuthStore } from '../store/useAuthStore';
 import { Briefcase, LogOut } from 'lucide-react';
 
-const Header: React.FC = () => {
+const Header = () => {
   const { token, logout } = useAuthStore();
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { aiService } from '../services/api';
 import { Mic, Loader2 } from 'lucide-react';
 
@@ -6,7 +6,7 @@ interface Props {
   onCommandProcessed: () => void;
 }
 
-const VoiceAssistantButton: React.FC<Props> = ({ onCommandProcessed }) => {
+const VoiceAssistantButton = ({ onCommandProcessed }: Props) => {
   const [isListening, setIsListening] = useState(false);
   const [status, setStatus] = useState<'idle' | 'listening' | 'processing'>('idle');
   const recognitionRef = useRef<any>(null);
