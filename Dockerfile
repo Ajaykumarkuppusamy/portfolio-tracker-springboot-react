@@ -21,8 +21,8 @@ COPY --from=frontend-build /app/frontend/dist ./src/main/resources/static/
 # Run the Maven package command
 RUN mvn clean package -DskipTests
 
-# --- Stage 3: Create the final, lightweight image ---
-FROM openjdk:17-jdk-slim
+# --- Stage 3: Create the final, lightweight, production-ready image ---
+FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
 # Copy ONLY the generated .jar file from the 'backend-build' stage
