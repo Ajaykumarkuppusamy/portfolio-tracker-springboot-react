@@ -1,6 +1,7 @@
 package com.example.portfoliotracker.service;
 
 import com.example.portfoliotracker.entity.Lot;
+import com.example.portfoliotracker.entity.Symbol;
 import com.example.portfoliotracker.entity.Trade;
 import com.example.portfoliotracker.entity.TradeSide; // Import the standalone enum
 import com.example.portfoliotracker.repository.LotRepository;
@@ -42,11 +43,15 @@ public class PortfolioCalculatorService {
             }
         }
         
+        List<Symbol> symbols = positions.values().stream().map(PositionDto::getSymbol).collect(Collectors.toList());
+        Map<Long, com.example.portfoliotracker.entity.PriceTick> quotes = quoteService.getLatestPrices(symbols);
+
         positions.values().forEach(pos -> {
-            quoteService.getLatestPrice(pos.getSymbol()).ifPresent(priceTick -> {
-                pos.setLastPrice(priceTick.getLast());
+            com.example.portfoliotracker.entity.PriceTick tick = quotes.get(pos.getSymbol().getId());
+            if (tick != null) {
+                pos.setLastPrice(tick.getLast());
                 pos.calculateUnrealizedPL();
-            });
+            }
         });
 
         // Filter out positions with zero quantity

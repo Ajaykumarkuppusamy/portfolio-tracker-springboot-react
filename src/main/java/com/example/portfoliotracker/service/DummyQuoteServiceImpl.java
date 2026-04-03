@@ -1,37 +1,42 @@
-// package com.example.portfoliotracker.service;
+package com.example.portfoliotracker.service;
 
-// import com.example.portfoliotracker.entity.PriceTick;
-// import com.example.portfoliotracker.entity.Symbol;
-// import org.springframework.stereotype.Service;
+import com.example.portfoliotracker.entity.PriceTick;
+import com.example.portfoliotracker.entity.Symbol;
+import org.springframework.stereotype.Service;
 
-// import java.math.BigDecimal;
-// import java.math.RoundingMode;
-// import java.time.LocalDateTime;
-// import java.util.Optional;
-// import java.util.Random;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Optional;
+import java.util.Random;
 
-// @Service
-// public class DummyQuoteServiceImpl implements QuoteService {
+@Service
+public class DummyQuoteServiceImpl implements QuoteService {
 
-//     private final Random random = new Random();
+    private final Random random = new Random();
 
-//     @Override
-//     public Optional<PriceTick> getLatestPrice(Symbol symbol) {
-//         // Generate a random price for demonstration purposes
-//         double randomFactor = 50 + (5000 - 50) * random.nextDouble();
-//         BigDecimal price = BigDecimal.valueOf(randomFactor).setScale(2, RoundingMode.HALF_UP);
-
-//         PriceTick tick = PriceTick.builder()
-//                 .symbol(symbol)
-//                 .asOf(LocalDateTime.now())
-//                 .last(price)
-//                 .prevClose(price.multiply(BigDecimal.valueOf(0.98))) // ~2% less
-//                 .dayOpen(price.multiply(BigDecimal.valueOf(0.99))) // ~1% less
-//                 .dayHigh(price.multiply(BigDecimal.valueOf(1.02))) // ~2% more
-//                 .dayLow(price.multiply(BigDecimal.valueOf(0.97))) // ~3% less
-//                 .volume(random.longs(10000, 1000000).findFirst().getAsLong())
-//                 .build();
+    @Override
+    public Optional<PriceTick> getLatestPrice(Symbol symbol) {
+        BigDecimal lastPrice = BigDecimal.valueOf(100 + random.nextDouble() * 900).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal prevClose = lastPrice.multiply(BigDecimal.valueOf(0.95 + random.nextDouble() * 0.1)).setScale(2, RoundingMode.HALF_UP);
         
-//         return Optional.of(tick);
-//     }
-// }
+        return Optional.of(PriceTick.builder()
+                .symbol(symbol)
+                .asOf(LocalDateTime.now())
+                .last(lastPrice)
+                .prevClose(prevClose)
+                .build());
+    }
+
+    @Override
+    public Map<Long, PriceTick> getLatestPrices(List<Symbol> symbols) {
+        Map<Long, PriceTick> results = new HashMap<>();
+        for (Symbol symbol : symbols) {
+            getLatestPrice(symbol).ifPresent(tick -> results.put(symbol.getId(), tick));
+        }
+        return results;
+    }
+}
